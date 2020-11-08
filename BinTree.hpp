@@ -1,8 +1,8 @@
 #include <mutex>
 
 namespace Tree {
-  template<typename T>
 
+  template<typename T>
   struct data_struct {
     T item;
     std::mutex mtx;
@@ -12,10 +12,11 @@ namespace Tree {
     }
   };
 
+  template<typename T>
   struct node {
     node * zero;
     node * one;
-    data_struct * dt;
+    data_struct<T> * dt;
     std::mutex mtx;
 
     node() {
@@ -36,33 +37,38 @@ namespace Tree {
     }
   };
 
+  template<typename T>
   class BinMap {
     private:
       node * root;
-      void BinMap::RecurInsert(size_t &key, const T &data, const node * nd);
-      data_struct& RecurFetch(size_t &key, const node * nd);
+      void BinMap<T>::RecurInsert(size_t &key, const T &data, const node<T> * nd);
+      data_struct<T>& RecurFetch(size_t &key, const node<T> * nd);
     public:
       BinMap();
       ~BinMap();
       void Insert(const size_t &key, const T &data);
       T& operator[] (const size_t &key);
-      data_struct& Get(const size_t &key);
+      data_struct<T>& Get(const size_t &key);
+  };
+
+  template<typename T>
+  BinMap<T>::BinMap() {
+    root = new node<T>;
   }
 
-  BinMap::BinMap() {
-    root = new node;
-  }
-
-  BinMap::~BinMap() {
+  template<typename T>
+  BinMap<T>::~BinMap() {
     delete root;
   }
 
-  void BinMap::Insert(const size_t &key, const T &data) {
+  template<typename T>
+  void BinMap<T>::Insert(const size_t &key, const T &data) {
     size_t key_copy = key;
-    BinMap::RecurInsert(key_copy, data, root);
+    BinMap<T>::RecurInsert(key_copy, data, root);
   }
 
-  void BinMap::RecurInsert(size_t &key, const T &data, const node * nd) {
+  template<typename T>
+  void BinMap<T>::RecurInsert(size_t &key, const T &data, const node<T> * nd) {
 
     nd->mtx.lock();
     // Check if key is 0
@@ -90,7 +96,7 @@ namespace Tree {
 
         // Remove LSB of key and go to next nd
         key = key >> 1;
-        BinMap::RecurInsert(key, data, nd->one);
+        BinMap<T>::RecurInsert(key, data, nd->one);
 
       } else {
         if (nd->zero == nullptr) {
@@ -100,25 +106,28 @@ namespace Tree {
 
         // Remove LSB of key and go to next nd
         key = key >> 1;
-        BinMap::RecurInsert(key, data, nd->zero);
+        BinMap<T>::RecurInsert(key, data, nd->zero);
 
       }
     }
   }
 
-  T& BinMap::operator[] (const size_t &key) {
+  template<typename T>
+  T& BinMap<T>::operator[] (const size_t &key) {
     size_t key_copy = key;
-    data_struct d = RecurFetch(key_copy, root);
+    data_struct<T> d = RecurFetch(key_copy, root);
     return d.item;
   }
   
-  data_struct& BinMap::Get(const size_t &key) {
+  template<typename T>
+  data_struct<T>& BinMap<T>::Get(const size_t &key) {
     size_t key_copy = key;
-    data_struct d = RecurFetch(key_copy, root);
+    data_struct<T> d = RecurFetch(key_copy, root);
     return d;
   }
 
-  data_struct& BinMap::RecurFetch(size_t &key, const node * nd) {
+  template<typename T>
+  data_struct<T>& BinMap<T>::RecurFetch(size_t &key, const node<T> * nd) {
       // Check if key is 0
       if (!key) {
         return nd->dt;
@@ -128,13 +137,13 @@ namespace Tree {
         if (key & 1) {
           // Remove LSB of key and go to next nd
           key = key >> 1;
-          return BinMap::RecurFetch(key, nd->one);
+          return BinMap<T>::RecurFetch(key, nd->one);
 
         } else {
 
           // Remove LSB of key and go to next nd
           key = key >> 1;
-          return BinMap::RecurFetch(key, nd->zero);
+          return BinMap<T>::RecurFetch(key, nd->zero);
 
         }
       }
