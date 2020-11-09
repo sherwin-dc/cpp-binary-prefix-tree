@@ -1,28 +1,18 @@
-#include <mutex>
+#include <atomic>
 
 namespace Tree {
 
-  template<typename T>
-  struct data_struct {
-    T item;
-    std::mutex mtx;
-
-    data_struct(const T &item_to_insert) {
-      item = item_to_insert;
-    }
-  };
 
   template<typename T>
   struct node {
-    node * zero;
-    node * one;
-    data_struct<T> * dt;
-    std::mutex mtx;
+    std::atomic<node *> zero;
+    std::atomic<node *> one;
+    std::atomic<T *> item;
 
     node() {
       zero = nullptr;
       one = nullptr;
-      dt = nullptr;
+      item = nullptr;
     }
     ~node() {
       if (zero != nullptr) {
@@ -31,8 +21,8 @@ namespace Tree {
       if (one != nullptr) {
         delete one;
       }
-      if (dt != nullptr) {
-        delete dt;
+      if (item != nullptr) {
+        delete item;
       }
     }
   };
@@ -41,14 +31,14 @@ namespace Tree {
   class BinMap {
     private:
       node * root;
-      void BinMap<T>::RecurInsert(size_t &key, const T &data, const node<T> * nd);
-      data_struct<T>& RecurFetch(size_t &key, const node<T> * nd);
+      void New_Traverse(node<T> * &nd, size_t key);
     public:
       BinMap();
       ~BinMap();
-      void Insert(const size_t &key, const T &data);
+      /* Stores a given key and a copy of a value in the map, overiding any existing value*/
+      void Insert(const size_t &key, const T data);
       T& operator[] (const size_t &key);
-      data_struct<T>& Get(const size_t &key);
+      T& Get(const size_t &key);
   };
 
   template<typename T>
@@ -62,55 +52,16 @@ namespace Tree {
   }
 
   template<typename T>
-  void BinMap<T>::Insert(const size_t &key, const T &data) {
-    size_t key_copy = key;
-    BinMap<T>::RecurInsert(key_copy, data, root);
+  void BinMap<T>::Insert(const size_t &key, const T data) {
+
+    node<T> * nd = root;
+    BinMap<T>::New_Traverse(nd, key);
+
+    // Will overwrite any existing data assignment
+    nd->item.store(&data, std::memory_order_relaxed);
+
   }
 
-  template<typename T>
-  void BinMap<T>::RecurInsert(size_t &key, const T &data, const node<T> * nd) {
-
-    nd->mtx.lock();
-    // Check if key is 0
-    if (!key) {
-
-      if (nd->dt == nullptr) {
-        // Create the data structure
-        nd->dt = new data_struct(data);
-      } else {
-        nd->dt->mtx.lock();
-        nd->dt->item = data;
-        nd->dt->mtx.unlock();
-      }
-      nd->mtx.unlock();
-
-    } else {
-      // check if the LSB of key is 1 or 0
-
-      if (key & 1) {
-
-        if (nd->one == nullptr) {
-          nd->one = new node();
-        }
-        nd->mtx.unlock();
-
-        // Remove LSB of key and go to next nd
-        key = key >> 1;
-        BinMap<T>::RecurInsert(key, data, nd->one);
-
-      } else {
-        if (nd->zero == nullptr) {
-          nd->zero = new node();
-        }
-        nd->mtx.unlock();
-
-        // Remove LSB of key and go to next nd
-        key = key >> 1;
-        BinMap<T>::RecurInsert(key, data, nd->zero);
-
-      }
-    }
-  }
 
   template<typename T>
   T& BinMap<T>::operator[] (const size_t &key) {
@@ -125,29 +76,54 @@ namespace Tree {
     data_struct<T> d = RecurFetch(key_copy, root);
     return d;
   }
+      
+  void BinMap<T>::New_Traverse(node<T> * &nd, size_t key) {
 
-  template<typename T>
-  data_struct<T>& BinMap<T>::RecurFetch(size_t &key, const node<T> * nd) {
-      // Check if key is 0
-      if (!key) {
-        return nd->dt;
-      } else {
-        // check if the LSB of key is 1 or 0
+    node<T> * new_node;
+    node<T> * expected_node;
 
-        if (key & 1) {
-          // Remove LSB of key and go to next nd
-          key = key >> 1;
-          return BinMap<T>::RecurFetch(key, nd->one);
+    while (key) {
+      // Check if LSB of key is 1 or 0
+      if (key & 1) {
+        
+        expected_node = nd->one.load(std::memory_order_relaxed);
+        if (expected_node == nullptr) {
+          new_node = new node<T>;
+          if (nd->one.compare_exchange_strong(expected_node, new_node, std::memory_order_relaxed, std::memory_order_relaxed)) {
+            nd = new_node;
+          } else {
+            nd = expected_node;
+            delete new_node;
+          }
 
         } else {
-
-          // Remove LSB of key and go to next nd
-          key = key >> 1;
-          return BinMap<T>::RecurFetch(key, nd->zero);
-
+          nd = expected_node;
         }
+
+
+      } else {
+
+        expected_node = nd->zero.load(std::memory_order_relaxed);
+        if (expected_node == nullptr) {
+          new_node = new node<T>;
+          if (nd->zero.compare_exchange_strong(expected_node, new_node, std::memory_order_relaxed, std::memory_order_relaxed)) {
+            nd = new_node;
+          } else {
+            nd = expected_node;
+            delete new_node;
+          }
+
+        } else {
+          nd = expected_node;
+        }
+
       }
+
+      key = key >> 1;
+      
+    }
   }
+
 
 
 
