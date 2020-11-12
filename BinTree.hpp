@@ -5,8 +5,8 @@ namespace Tree {
 
   template<typename T>
   struct node {
-    std::atomic<node *> zero;
-    std::atomic<node *> one;
+    std::atomic<node<T> *> zero;
+    std::atomic<node<T> *> one;
     std::atomic<T *> item;
 
     node() {
@@ -24,7 +24,7 @@ namespace Tree {
   template<typename T>
   class BinMap {
     private:
-      node * root;
+      node<T> * root;
       void safe_traverse(node<T> * &nd, size_t key);
       void quick_traverse(node<T> * &nd, size_t key);
     public:
