@@ -8,6 +8,10 @@
 #include <benchmark/benchmark.h>
 
 #define NUM_KEYS 10000
+#define SETUP                                               \
+  std::vector<uint64_t> numbers;                            \
+  numbers.reserve(NUM_KEYS);                                \
+  GenerateRandom(numbers, NUM_KEYS, state.range(0), 0);     \
 
 // Generates unique random numbers
 void GenerateRandom(std::vector<uint64_t> &result, size_t num_keys, size_t bits, size_t seed) {
@@ -30,10 +34,7 @@ void GenerateRandom(std::vector<uint64_t> &result, size_t num_keys, size_t bits,
 
 static void BM_std_unordered_map_insert(benchmark::State& state) {
   // Perform setup here
-  std::vector<uint64_t> numbers;
-  numbers.reserve(NUM_KEYS);  
-  GenerateRandom(numbers, NUM_KEYS, state.range(0), 0);
-
+  SETUP;
 
   for (auto _ : state) {
     // This code gets timed
@@ -51,9 +52,7 @@ static void BM_std_unordered_map_insert(benchmark::State& state) {
 
 static void BM_std_unordered_map_read(benchmark::State& state) {
   // Perform setup here
-  std::vector<uint64_t> numbers;
-  numbers.reserve(NUM_KEYS);  
-  GenerateRandom(numbers, NUM_KEYS, state.range(0), 0);
+  SETUP;
 
   std::unordered_map<uint64_t, uint64_t> map;
   map.reserve(2*NUM_KEYS);
@@ -65,47 +64,35 @@ static void BM_std_unordered_map_read(benchmark::State& state) {
   for (auto _ : state) {
     // This code gets timed
     uint64_t value;
-
     for (size_t i=0; i<numbers.size(); i++) {
       benchmark::DoNotOptimize(value = map[numbers[i]]);
     }
-    
-
   }
 
 }
 
 static void BM_ConcurrentBinMap_insert(benchmark::State& state) {
   // Perform setup here
-  std::vector<uint64_t> numbers;
-  numbers.reserve(NUM_KEYS);  
-  GenerateRandom(numbers, NUM_KEYS, state.range(0), 0);
+  SETUP;
 
   BinTree::ConcurentBinMap<uint64_t> map;
 
   for (auto _ : state) {
     // This code gets timed
-
     #pragma omp parallel
     { 
-      
       #pragma omp for
       for (size_t i=0; i<numbers.size(); i++) {
         map.insert(numbers[i], i);
       }
-
     }
-    
-
   }
 
 }
 
 static void BM_ConcurrentBinMap_read(benchmark::State& state) {
   // Perform setup here
-  std::vector<uint64_t> numbers;
-  numbers.reserve(NUM_KEYS);  
-  GenerateRandom(numbers, NUM_KEYS, state.range(0), 0);
+  SETUP;
 
   BinTree::ConcurentBinMap<uint64_t> map;
 
@@ -118,14 +105,11 @@ static void BM_ConcurrentBinMap_read(benchmark::State& state) {
     #pragma omp parallel
     {
       uint64_t value;
-
       #pragma omp for
       for (size_t i=0; i<numbers.size(); i++) {
         benchmark::DoNotOptimize(value = map.get(numbers[i]));
       }
-      
     }
-
   }
 
 }
