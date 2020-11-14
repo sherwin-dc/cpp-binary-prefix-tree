@@ -1,24 +1,42 @@
 #include <atomic>
 #include <cstddef>
 
+#ifndef BINMAP_EXP
+  #define BINMAP_EXP 1
+#endif
+
+
+#define BINMAP_POW_1   2
+#define BINMAP_POW_2   4
+#define BINMAP_POW_3   8
+#define BINMAP_POW_4   16
+#define BINMAP_POW_5   32
+#define BINMAP_POW_6   64
+#define BINMAP_POW_7   128
+#define BINMAP_POW_8   256
+#define BINMAP_POW_9   512
+#define BINMAP_POW_10  1024
+
+#define BINMAP_POW_(x) BINMAP_POW_##x
+#define BINMAP_POW(x) BINMAP_POW_(x)
+#define BINMAP_WIDTH BINMAP_POW(BINMAP_EXP)
+
 namespace BinTree {
 
 
   template<typename T>
   struct node {
-    std::atomic<node<T> *> zero;
-    std::atomic<node<T> *> one;
+    std::atomic<node<T> *> next[BINMAP_WIDTH];
     std::atomic<T *> item;
 
-    node() {
-      zero = nullptr;
-      one = nullptr;
+    node() : next() {
       item = nullptr;
     }
     ~node() {
-      delete zero;
-      delete one;
       delete item;
+      for (size_t i=0; i<BINMAP_WIDTH; i++) {
+        delete next[i];
+      }
     }
   };
 
@@ -89,45 +107,29 @@ namespace BinTree {
 
     node<T> * new_node;
     node<T> * expected_node;
+    size_t idx;
 
     while (key) {
       // Check if LSB of key is 1 or 0
-      if (key & 1) {
-        
-        expected_node = nd->one.load(std::memory_order_relaxed);
-        if (expected_node == nullptr) {
-          new_node = new node<T>;
-          if (nd->one.compare_exchange_strong(expected_node, new_node, std::memory_order_relaxed, std::memory_order_relaxed)) {
-            nd = new_node;
-          } else {
-            nd = expected_node;
-            delete new_node;
-          }
 
+      // Get the last EXP bits
+      idx = key & (BINMAP_WIDTH-1);
+        
+      expected_node = nd->next[idx].load(std::memory_order_relaxed);
+      if (expected_node == nullptr) {
+        new_node = new node<T>;
+        if (nd->next[idx].compare_exchange_strong(expected_node, new_node, std::memory_order_relaxed, std::memory_order_relaxed)) {
+          nd = new_node;
         } else {
           nd = expected_node;
+          delete new_node;
         }
-
 
       } else {
-
-        expected_node = nd->zero.load(std::memory_order_relaxed);
-        if (expected_node == nullptr) {
-          new_node = new node<T>;
-          if (nd->zero.compare_exchange_strong(expected_node, new_node, std::memory_order_relaxed, std::memory_order_relaxed)) {
-            nd = new_node;
-          } else {
-            nd = expected_node;
-            delete new_node;
-          }
-
-        } else {
-          nd = expected_node;
-        }
-
+        nd = expected_node;
       }
 
-      key = key >> 1;
+      key = key >> BINMAP_EXP;
       
     }
   }
@@ -135,16 +137,14 @@ namespace BinTree {
   template<typename T>
   void ConcurentBinMap<T>::quick_traverse(node<T> * &nd, size_t key) {
 
+    size_t idx;
     while (key) {
-      // Check if LSB of key is 1 or 0
-      if (key & 1) {
-        nd = nd->one.load(std::memory_order_relaxed);
-      } else {
-        nd = nd->zero.load(std::memory_order_relaxed);
-      }
-      key = key >> 1;
+      // Get the last EXP bits
+      idx = key & (BINMAP_WIDTH-1);
+      nd = nd->next[idx].load(std::memory_order_relaxed);
+      key = key >> BINMAP_EXP;
     }
-
+    
   }
 
 
