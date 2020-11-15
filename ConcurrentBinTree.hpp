@@ -90,7 +90,7 @@ namespace BinTree {
     node<T> * nd = root;
     ConcurrentBinMap<T>::safe_traverse(nd, key);
 
-    // Returns reference of node's pointer to T
+    // Returns pointer of node's pointer to T
     return &(nd->item);
 
   }
