@@ -2,12 +2,13 @@
 #include <iostream>
 #include <vector>
 #include <random>
+#include <cmath>
 #include <unordered_set>
 #include <unordered_map>
 // Google benchmark. https://github.com/google/benchmark
 #include <benchmark/benchmark.h>
 
-#define NUM_KEYS 10000
+#define NUM_KEYS 1e6
 #define SETUP                                               \
   std::vector<uint64_t> numbers;                            \
   numbers.reserve(NUM_KEYS);                                \
@@ -16,8 +17,11 @@
 // Generates unique random numbers
 void GenerateRandom(std::vector<uint64_t> &result, size_t num_keys, size_t bits, size_t seed) {
 
+  // number of keys to generate would be number of keys within bit size or NUM_KEYS, whichever is smaller
+  num_keys = num_keys > pow(2, bits) ? pow(2, bits) : num_keys;
+
   std::unordered_set<uint64_t> set;
-  set.reserve(num_keys);
+  set.reserve(1.2 * num_keys);
   uint64_t num;
 
   std::mt19937_64 rng(seed);
@@ -39,7 +43,7 @@ static void BM_std_unordered_map_insert(benchmark::State& state) {
   for (auto _ : state) {
     // This code gets timed
     std::unordered_map<uint64_t, uint64_t> map;
-    map.reserve(2*NUM_KEYS);
+    // map.reserve(2*NUM_KEYS);
 
     for (size_t i=0; i<numbers.size(); i++) {
       map[numbers[i]] = i;
@@ -55,7 +59,7 @@ static void BM_std_unordered_map_read(benchmark::State& state) {
   SETUP;
 
   std::unordered_map<uint64_t, uint64_t> map;
-  map.reserve(2*NUM_KEYS);
+  // map.reserve(2*NUM_KEYS);
 
   for (size_t i=0; i<numbers.size(); i++) {
     map[numbers[i]] = i;
@@ -114,7 +118,7 @@ static void BM_ConcurrentBinMap_read(benchmark::State& state) {
 
 }
 
-#define TESTS RangeMultiplier(2)->Range(16, 64)->UseRealTime()
+#define TESTS RangeMultiplier(2)->Range(8, 64)->UseRealTime()
 
 BENCHMARK(BM_std_unordered_map_insert)->TESTS;
 BENCHMARK(BM_std_unordered_map_read)->TESTS;
