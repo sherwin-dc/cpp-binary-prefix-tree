@@ -1,8 +1,10 @@
+#define BINMAP_EXP 3
+
 #include <atomic>
 #include <cstddef>
 
 #ifndef BINMAP_EXP
-  #define BINMAP_EXP 1
+  #error "Width of Map not defined. Before inclusion or at top of the file, define with '#define BINMAP_EXP n' for a node width of 2^n"
 #endif
 
 
@@ -77,6 +79,7 @@ namespace BinTree {
     ConcurentBinMap<T>::safe_traverse(nd, key);
     T * new_value = new T(data);
     // Will overwrite any existing data assignment
+    delete nd->item;
     nd->item.store(new_value, std::memory_order_relaxed);
 
   }
@@ -110,8 +113,6 @@ namespace BinTree {
     size_t idx;
 
     while (key) {
-      // Check if LSB of key is 1 or 0
-
       // Get the last EXP bits
       idx = key & (BINMAP_WIDTH-1);
         
