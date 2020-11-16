@@ -75,7 +75,7 @@ namespace BinTree {
   void SimpleBinMap<T>::insert(const size_t &key, const T &data) {
 
     s_node<T> * nd = root;
-    size_t idx=0;
+    size_t idx = 0;
     SimpleBinMap<T>::safe_traverse(nd, key, idx);
 
     // Will overwrite any existing data assignment
@@ -86,7 +86,7 @@ namespace BinTree {
   template<typename T>
   T* SimpleBinMap<T>::query(const size_t &key) {
     s_node<T> * nd = root;
-    size_t idx=0;
+    size_t idx = 0;
     SimpleBinMap<T>::safe_traverse(nd, key, idx);
 
     // Returns pointer to T
@@ -98,7 +98,7 @@ namespace BinTree {
   template<typename T>
   T& SimpleBinMap<T>::get(const size_t &key) {
     s_node<T> * nd = root;
-    size_t idx=0;
+    size_t idx = 0;
     SimpleBinMap<T>::quick_traverse(nd, key, idx);
 
     // Return T
@@ -112,7 +112,7 @@ namespace BinTree {
       // Get the last EXP bits
       idx = key & (BINMAP_WIDTH-1);
       key = key >> BINMAP_EXP;
-      if (key) {
+      if (!key) {
         break;
       }
         
@@ -132,7 +132,7 @@ namespace BinTree {
       // Get the last EXP bits
       idx = key & (BINMAP_WIDTH-1);
       key = key >> BINMAP_EXP; 
-      if(key) {
+      if(!key) {
         break;
       }     
       nd = nd->next[idx];

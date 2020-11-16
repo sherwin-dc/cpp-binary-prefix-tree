@@ -29,13 +29,13 @@ namespace BinTree {
   template<typename T>
   struct node {
     std::atomic<node<T> *> next[BINMAP_WIDTH];
-    std::atomic<T *> item;
+    std::atomic<T> item[BINMAP_WIDTH];
 
     node() : next() {
-      item = nullptr;
+
     }
     ~node() {
-      delete item;
+
       for (size_t i=0; i<BINMAP_WIDTH; i++) {
         delete next[i];
       }
@@ -46,21 +46,20 @@ namespace BinTree {
   class ConcurrentBinMap {
     private:
       node<T> * root;
-      void safe_traverse(node<T> * &nd, size_t key);
-      void quick_traverse(node<T> * &nd, size_t key);
+      void safe_traverse(node<T> * &nd, size_t key, size_t &idx);
+      void quick_traverse(node<T> * &nd, size_t key, size_t &idx);
     public:
       ConcurrentBinMap();
       ~ConcurrentBinMap();
       
       /*  Stores a given key and a dynamically allocated copy of a value in the map, overiding any existing value */
       void insert(const size_t &key, const T &data);
-      /*  Returns the pointer of atomic pointer to the value stored by the key, i.e. std::atomic<value *>*. 
-          This pointer is nullptr if no value had been inserted, and can be used to subsequently set or change an inserted value.
+      /*  Returns the pointer to the value stored by the key, i.e. std::atomic<value> *. 
           This is equivalent to an insert without setting a value */
-      std::atomic<T *> * query(const size_t &key);
+      std::atomic<T> * query(const size_t &key);
       /*  Gets a value that is guarenteed to already be in the map
           This fast but unsafe if value has not already been inserted */
-      T& get(const size_t &key);
+      const T get(const size_t &key);
   };
 
   template<typename T>
@@ -77,46 +76,50 @@ namespace BinTree {
   void ConcurrentBinMap<T>::insert(const size_t &key, const T &data) {
 
     node<T> * nd = root;
-    ConcurrentBinMap<T>::safe_traverse(nd, key);
-    T * new_value = new T(data);
+    size_t idx = 0;
+    ConcurrentBinMap<T>::safe_traverse(nd, key, idx);
+
     // Will overwrite any existing data assignment
-    delete nd->item;
-    nd->item.store(new_value, std::memory_order_relaxed);
+    nd->item[idx].store(data, std::memory_order_relaxed);
 
   }
 
   template<typename T>
-  std::atomic<T *> * ConcurrentBinMap<T>::query(const size_t &key) {
+  std::atomic<T> * ConcurrentBinMap<T>::query(const size_t &key) {
     node<T> * nd = root;
-    ConcurrentBinMap<T>::safe_traverse(nd, key);
+    size_t idx = 0;
+    ConcurrentBinMap<T>::safe_traverse(nd, key, idx);
 
     // Returns pointer of node's pointer to T
-    return &(nd->item);
+    return &(nd->item[idx]);
 
   }
 
   
   template<typename T>
-  T& ConcurrentBinMap<T>::get(const size_t &key) {
+  const T ConcurrentBinMap<T>::get(const size_t &key) {
     node<T> * nd = root;
-    ConcurrentBinMap<T>::quick_traverse(nd, key);
+    size_t idx = 0;
+    ConcurrentBinMap<T>::quick_traverse(nd, key, idx);
 
     // Return T
-    T * value = nd->item.load(std::memory_order_relaxed);
-    return *value;
+    return nd->item[idx].load(std::memory_order_relaxed);
   }
   
   template<typename T>
-  void ConcurrentBinMap<T>::safe_traverse(node<T> * &nd, size_t key) {
+  void ConcurrentBinMap<T>::safe_traverse(node<T> * &nd, size_t key, size_t &idx) {
 
     node<T> * new_node;
     node<T> * expected_node;
-    size_t idx;
 
     while (key) {
       // Get the last EXP bits
       idx = key & (BINMAP_WIDTH-1);
-        
+      key = key >> BINMAP_EXP;
+
+      if (!key) {
+        break;
+      }        
       expected_node = nd->next[idx].load(std::memory_order_relaxed);
       if (expected_node == nullptr) {
         new_node = new node<T>;
@@ -131,20 +134,24 @@ namespace BinTree {
         nd = expected_node;
       }
 
-      key = key >> BINMAP_EXP;
+
       
     }
   }
 
   template<typename T>
-  void ConcurrentBinMap<T>::quick_traverse(node<T> * &nd, size_t key) {
+  void ConcurrentBinMap<T>::quick_traverse(node<T> * &nd, size_t key, size_t &idx) {
 
-    size_t idx;
+
     while (key) {
       // Get the last EXP bits
       idx = key & (BINMAP_WIDTH-1);
-      nd = nd->next[idx].load(std::memory_order_relaxed);
       key = key >> BINMAP_EXP;
+      if (!key) {
+        break;
+      }
+      nd = nd->next[idx].load(std::memory_order_relaxed);
+
     }
     
   }

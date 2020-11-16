@@ -108,7 +108,7 @@ static void BM_ConcurrentBinMap_insert_no_reserve(benchmark::State& state) {
     state.ResumeTiming();
 
     // This code gets timed
-    #pragma omp parallel
+    #pragma omp parallel num_threads(4)
     { 
       #pragma omp for
       for (size_t i=0; i<numbers.size(); i++) {
@@ -134,7 +134,7 @@ static void BM_ConcurrentBinMap_insert_reserve(benchmark::State& state) {
     state.ResumeTiming();
 
     // This code gets timed
-    #pragma omp parallel
+    #pragma omp parallel num_threads(4)
     { 
       #pragma omp for
       for (size_t i=0; i<numbers.size(); i++) {
@@ -157,7 +157,7 @@ static void BM_ConcurrentBinMap_read(benchmark::State& state) {
 
   for (auto _ : state) {
     // This code gets timed
-    #pragma omp parallel
+    #pragma omp parallel num_threads(4)
     {
       uint64_t value;
       #pragma omp for
