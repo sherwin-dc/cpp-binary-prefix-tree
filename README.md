@@ -3,7 +3,23 @@
 
 This is meant to be an alternate implementation of a hash map, or `unordered_map` in C++, which is intended to be thread safe.  
 
-This works for keys that can be casted to a `size_t`, such as integers.  
+This works for keys that can be casted to a `size_t`, such as integers, and is faster than unordered_map for keys less than 2^16. 
+
+# Benefits
+
+## Speed
+
+All operations performed are on the order of θ(log(n)).
+For keys with smaller values (~2<sup>16</sup>) operations are performed faster than with `std::unordered_map`. See Benchmark for details.
+
+## Thread Safety
+
+The concurrent version of the map makes use of atomics to allow multiple threads to simultaneously insert and obtain values.
+
+## No resizing
+
+This map creates new nodes an needed, and no resizing is required, unlike some hash maps. This means any pointers directly referencing values in the tree would always be valid.
+
 
 # Implementation
 
@@ -21,7 +37,7 @@ For example, given the following key value pairs:
 Each key value is read in binary from right to left and inserted in an appropriate place in the tree, as shown.  
 Note that nodes in the tree are only created where needed, and nodes may have only 1 branch.  
 
-```c++
+```
 
          root
            *~~B
@@ -33,21 +49,40 @@ Note that nodes in the tree are only created where needed, and nodes may have on
      \
       *~~D
 ```
+However, this implementation is not very cache frendly as a lot of traversing is required to reach values.
 
-# Benefits
+The tree can be 'squished' by increasing the number of children each node has. In this case pairs of 2 bits are obtained from the key to traverse the tree.
 
-All operations performed are on the order of log<sub>2</sub>(n)
-The advantages of this compared to a hash map are:
+```
+                root
+       00/  01/  10\   11\
+        *     *    *      *
+```
 
-## Thread Safety
+At the same time, each node can be masde to store multiple values.
 
-Note: This is still a work in progress and there is no guarentees that an unintended data race would not occur. If you spot any errors feel free to add a bug report to create a pull request.  
-However this map has been designed with thread safety in mind and all operations on the map should be able to happen concurrently by multiple threads.
+```
+        * 00
+        |~~
+        | 01
+        |~~
+        | 10
+        |~~
+        | 11
+        |~~
+```
 
-## No hash functions are used
+# Benchmark
 
-There is no need to deal with hash functions since the keys are integral types, hence no collisions in the map can occur.
-Remapping and rehashing of the tree do not occur
+The different maps were benchmarked using [Google Benchmark](https://github.com/google/benchmark). The code was compiled with gcc 10.2.0 using `-O3` and `-std=c++11` flags and linked to the benchmark libraries and openMP for parallel testing.  
 
+In each test, unique random keys of a certain bit length were generated and inserted into the map. The total number of keys used were equal to the number that could fit within the number of bits tested (i.e. 65536 keys for 16-bit numbers) or 1 million keys, whichever was smaller. The time taken to insert the keys into the map, both with and without preallocation, as well as the time taken to read back stored values, was benchmarked.  
 
-3. Memory is allocated as needed
+Comments have been added to the output shown below for clarity
+
+## Preallocation
+
+The speed of inserting values into `BinMap` does significantly change when space is preallocated for it, compared to `unordered_map` which needs to rehash keys when too many are inserted. This means that `BinMap` performs better when the total number of keys is not known, since no key inserted will ever cause a rehash of the map.
+
+```
+```
