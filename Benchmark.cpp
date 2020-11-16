@@ -228,7 +228,8 @@ static void BM_SimpleBinMap_read(benchmark::State& state) {
 
 }
 
-#define TESTS RangeMultiplier(2)->Range(8, 64)->UseRealTime()
+// #define TESTS RangeMultiplier(2)->Range(8, 64)->UseRealTime()
+#define TESTS DenseRange(2,16,2)->UseRealTime()
 
 BENCHMARK(BM_std_unordered_map_insert_no_reserve)->TESTS;
 BENCHMARK(BM_std_unordered_map_insert_reserve)->TESTS;

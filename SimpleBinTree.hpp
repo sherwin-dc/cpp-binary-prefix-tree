@@ -28,13 +28,13 @@ namespace BinTree {
   template<typename T>
   struct s_node {
     s_node<T> * next[BINMAP_WIDTH];
-    T * item;
+    T item[BINMAP_WIDTH];
 
     s_node() : next() {
-      item = nullptr;
+
     }
     ~s_node() {
-      delete item;
+
       for (size_t i=0; i<BINMAP_WIDTH; i++) {
         delete next[i];
       }
@@ -45,18 +45,17 @@ namespace BinTree {
   class SimpleBinMap {
     private:
       s_node<T> * root;
-      void safe_traverse(s_node<T> * &nd, size_t key);
-      void quick_traverse(s_node<T> * &nd, size_t key);
+      void safe_traverse(s_node<T> * &nd, size_t key, size_t &idx);
+      void quick_traverse(s_node<T> * &nd, size_t key, size_t &idx);
     public:
       SimpleBinMap();
       ~SimpleBinMap();
       
       /*  Stores a given key and a dynamically allocated copy of a value in the map, overiding any existing value */
       void insert(const size_t &key, const T &data);
-      /*  Returns the pointer of atomic pointer to the value stored by the key, i.e. value **. 
-          This pointer is nullptr if no value had been inserted, and can be used to subsequently set or change an inserted value.
+      /*  Returns the pointer to the value stored by the key, i.e. value *. 
           This is equivalent to an insert without setting a value */
-      T** query(const size_t &key);
+      T* query(const size_t &key);
       /*  Gets a value that is guarenteed to already be in the map
           This fast but unsafe if value has not already been inserted */
       T& get(const size_t &key);
@@ -76,21 +75,22 @@ namespace BinTree {
   void SimpleBinMap<T>::insert(const size_t &key, const T &data) {
 
     s_node<T> * nd = root;
-    SimpleBinMap<T>::safe_traverse(nd, key);
-    T * new_value = new T(data);
+    size_t idx=0;
+    SimpleBinMap<T>::safe_traverse(nd, key, idx);
+
     // Will overwrite any existing data assignment
-    delete nd->item;
-    nd->item =new_value;
+    nd->item[idx] = data;
 
   }
 
   template<typename T>
-  T** SimpleBinMap<T>::query(const size_t &key) {
+  T* SimpleBinMap<T>::query(const size_t &key) {
     s_node<T> * nd = root;
-    SimpleBinMap<T>::safe_traverse(nd, key);
+    size_t idx=0;
+    SimpleBinMap<T>::safe_traverse(nd, key, idx);
 
-    // Returns pointer of s_node's pointer to T
-    return &(nd->item);
+    // Returns pointer to T
+    return &(nd->item[idx]);
 
   }
 
@@ -98,40 +98,45 @@ namespace BinTree {
   template<typename T>
   T& SimpleBinMap<T>::get(const size_t &key) {
     s_node<T> * nd = root;
-    SimpleBinMap<T>::quick_traverse(nd, key);
+    size_t idx=0;
+    SimpleBinMap<T>::quick_traverse(nd, key, idx);
 
     // Return T
-    return *(nd->item);
+    return nd->item[idx];
   }
   
   template<typename T>
-  void SimpleBinMap<T>::safe_traverse(s_node<T> * &nd, size_t key) {
-
-    size_t idx;
+  void SimpleBinMap<T>::safe_traverse(s_node<T> * &nd, size_t key, size_t &idx) {
 
     while (key) {
       // Get the last EXP bits
       idx = key & (BINMAP_WIDTH-1);
+      key = key >> BINMAP_EXP;
+      if (key) {
+        break;
+      }
         
       if (!nd->next[idx]) {
         nd->next[idx] = new s_node<T>;
       }
 
       nd = nd->next[idx];
-      key = key >> BINMAP_EXP;
       
     }
   }
 
   template<typename T>
-  void SimpleBinMap<T>::quick_traverse(s_node<T> * &nd, size_t key) {
+  void SimpleBinMap<T>::quick_traverse(s_node<T> * &nd, size_t key, size_t &idx) {
 
-    size_t idx;
     while (key) {
       // Get the last EXP bits
       idx = key & (BINMAP_WIDTH-1);
+      key = key >> BINMAP_EXP; 
+      if(key) {
+        break;
+      }     
       nd = nd->next[idx];
-      key = key >> BINMAP_EXP;
+
     }
     
   }
