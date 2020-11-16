@@ -1,6 +1,5 @@
 #define BINMAP_EXP 3
 
-#include <atomic>
 #include <cstddef>
 
 #ifndef BINMAP_EXP
@@ -102,8 +101,7 @@ namespace BinTree {
     SimpleBinMap<T>::quick_traverse(nd, key);
 
     // Return T
-    T * value = nd->item;
-    return *value;
+    return *(nd->item);
   }
   
   template<typename T>

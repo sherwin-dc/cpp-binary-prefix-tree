@@ -9,16 +9,16 @@
 #include <benchmark/benchmark.h> // Google benchmark. https://github.com/google/benchmark
 
 #define NUM_KEYS 1e6
-#define SETUP                                               \
-  std::vector<uint64_t> numbers;                            \
-  numbers.reserve(NUM_KEYS);                                \
-  GenerateRandom(numbers, NUM_KEYS, state.range(0), 0);     \
+#define SETUP                                                                         \
+  std::vector<uint64_t> numbers;                                                      \
+  size_t num_keys = NUM_KEYS;                                                         \
+  /* no of keys to generate would be smaller of (2^bit_size or NUM_KEYS)   */         \
+  num_keys = num_keys > pow(2, state.range(0)) ? pow(2, state.range(0)) : num_keys;   \
+  numbers.reserve(num_keys);                                                          \
+  GenerateRandom(numbers, num_keys, state.range(0), 0);                               \
 
 // Generates unique random numbers
 void GenerateRandom(std::vector<uint64_t> &result, size_t num_keys, size_t bits, size_t seed) {
-
-  // number of keys to generate would be number of keys within bit size or NUM_KEYS, whichever is smaller
-  num_keys = num_keys > pow(2, bits) ? pow(2, bits) : num_keys;
 
   std::unordered_set<uint64_t> set;
   set.reserve(1.2 * num_keys);
@@ -42,8 +42,12 @@ static void BM_std_unordered_map_insert_reserve(benchmark::State& state) {
 
   for (auto _ : state) {
     // This code gets timed
+    
+    state.PauseTiming();
     std::unordered_map<uint64_t, uint64_t> map;
-    map.reserve(1.2*NUM_KEYS);
+    map.reserve(1.2*num_keys);
+    state.ResumeTiming();
+
 
     for (size_t i=0; i<numbers.size(); i++) {
       map[numbers[i]] = i;
@@ -58,8 +62,9 @@ static void BM_std_unordered_map_insert_no_reserve(benchmark::State& state) {
 
   for (auto _ : state) {
     // This code gets timed
+    state.PauseTiming();
     std::unordered_map<uint64_t, uint64_t> map;
-    // map.reserve(1.2*NUM_KEYS);
+    state.ResumeTiming();
 
     for (size_t i=0; i<numbers.size(); i++) {
       map[numbers[i]] = i;
@@ -75,7 +80,7 @@ static void BM_std_unordered_map_read(benchmark::State& state) {
   SETUP;
 
   std::unordered_map<uint64_t, uint64_t> map;
-  map.reserve(1.2*NUM_KEYS);
+  map.reserve(1.2*num_keys);
 
   for (size_t i=0; i<numbers.size(); i++) {
     map[numbers[i]] = i;
@@ -91,13 +96,43 @@ static void BM_std_unordered_map_read(benchmark::State& state) {
 
 }
 
-static void BM_ConcurrentBinMap_insert(benchmark::State& state) {
+static void BM_ConcurrentBinMap_insert_no_reserve(benchmark::State& state) {
   // Perform setup here
   SETUP;
 
-  BinTree::ConcurrentBinMap<uint64_t> map;
 
   for (auto _ : state) {
+    
+    state.PauseTiming();
+    BinTree::ConcurrentBinMap<uint64_t> map;
+    state.ResumeTiming();
+
+    // This code gets timed
+    #pragma omp parallel
+    { 
+      #pragma omp for
+      for (size_t i=0; i<numbers.size(); i++) {
+        map.insert(numbers[i], i);
+      }
+    }
+  }
+
+}
+
+static void BM_ConcurrentBinMap_insert_reserve(benchmark::State& state) {
+  // Perform setup here
+  SETUP;
+
+
+  for (auto _ : state) {
+    
+    state.PauseTiming();
+    BinTree::ConcurrentBinMap<uint64_t> map;
+    for (auto num : numbers) {
+      map.query(num);
+    }
+    state.ResumeTiming();
+
     // This code gets timed
     #pragma omp parallel
     { 
@@ -134,17 +169,41 @@ static void BM_ConcurrentBinMap_read(benchmark::State& state) {
 
 }
 
-static void BM_SimpleBinMap_insert(benchmark::State& state) {
+static void BM_SimpleBinMap_insert_no_reserve(benchmark::State& state) {
   // Perform setup here
   SETUP;
 
-  BinTree::SimpleBinMap<uint64_t> map;
 
   for (auto _ : state) {
+    state.PauseTiming();
+    BinTree::SimpleBinMap<uint64_t> map;
+    state.ResumeTiming();
+
     // This code gets timed
-      for (size_t i=0; i<numbers.size(); i++) {
-        map.insert(numbers[i], i);
-      }
+    for (size_t i=0; i<numbers.size(); i++) {
+      map.insert(numbers[i], i);
+    }
+  }
+
+}
+
+static void BM_SimpleBinMap_insert_reserve(benchmark::State& state) {
+  // Perform setup here
+  SETUP;
+
+
+  for (auto _ : state) {
+    state.PauseTiming();
+    BinTree::SimpleBinMap<uint64_t> map;
+    for (auto num : numbers) {
+      map.query(num);
+    }
+    state.ResumeTiming();
+    
+    // This code gets timed
+    for (size_t i=0; i<numbers.size(); i++) {
+      map.insert(numbers[i], i);
+    }
   }
 
 }
@@ -171,14 +230,16 @@ static void BM_SimpleBinMap_read(benchmark::State& state) {
 
 #define TESTS RangeMultiplier(2)->Range(8, 64)->UseRealTime()
 
-BENCHMARK(BM_std_unordered_map_insert_reserve)->TESTS;
 BENCHMARK(BM_std_unordered_map_insert_no_reserve)->TESTS;
+BENCHMARK(BM_std_unordered_map_insert_reserve)->TESTS;
 BENCHMARK(BM_std_unordered_map_read)->TESTS;
 
-BENCHMARK(BM_ConcurrentBinMap_insert)->TESTS;
+BENCHMARK(BM_ConcurrentBinMap_insert_no_reserve)->TESTS;
+BENCHMARK(BM_ConcurrentBinMap_insert_reserve)->TESTS;
 BENCHMARK(BM_ConcurrentBinMap_read)->TESTS;
 
-BENCHMARK(BM_SimpleBinMap_insert)->TESTS;
+BENCHMARK(BM_SimpleBinMap_insert_no_reserve)->TESTS;
+BENCHMARK(BM_SimpleBinMap_insert_reserve)->TESTS;
 BENCHMARK(BM_SimpleBinMap_read)->TESTS;
 
 BENCHMARK_MAIN();
