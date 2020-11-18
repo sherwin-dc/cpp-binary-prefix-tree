@@ -14,13 +14,19 @@ For keys with smaller values (~2<sup>16</sup>) operations are performed faster t
 
 ## Thread Safety
 
-The concurrent version of the map makes use of atomics to allow multiple threads to simultaneously insert and obtain values.
+The concurrent version of `BinMap` makes use of atomics to allow multiple threads to simultaneously insert and obtain values.
 
 ## No resizing
 
-This map creates new nodes an needed, and no resizing is required, unlike some hash maps. This means any pointers directly referencing values in the tree would always be valid.
+`BinMap` creates new nodes an needed, and no resizing is required, unlike some hash maps. This means any pointers directly referencing values in the tree would always be valid.
+
+## Flexibility
+
+There is a trade off between speed and memory usage, which the user can control at compile time by specifying the size of each node. For example, a tree with each node having 2 children would use less memory but perform slower than a tree with each node having 16 children.
 
 # Usage
+
+Simply `#include` the header files that you need. Be sure to define the [bit width](#changing-node-size) of the tree with `#define BINMAP_BITS` before including the header.
 
 ## Single threaded
 
@@ -76,6 +82,8 @@ int main() {
 
 # Implementation
 
+## Naive implementation
+
 The basic idea behind `BinMap` is to implement a binary tree similar to a Suffix tree.  
 When a key and value are given to the map, it looks at the binary value of the key and places the value in a leaf of the tree that can be obtained by following the binary value of the key.  
 For example, given the following key value pairs:
@@ -104,6 +112,8 @@ Note that nodes in the tree are only created where needed, and nodes may have on
 ```
 However, this implementation is not very cache frendly as a lot of traversing is required to reach values.
 
+## Changing node size
+
 The tree can be 'squished' by increasing the number of children each node has. In this case pairs of 2 bits are obtained from the key to traverse the tree, and the length of the tree is reduced from log<sub>2</sub>(n) to log<sub>4</sub>(n).
 
 ```
@@ -125,9 +135,9 @@ At the same time, each node can be made to store multiple values, such that an e
         |~~
 ```
 
-In this case the tree is no longer a 'binary' tree where each node has 2 children, but still uses the binary value of the key to traverse the tree.  
+In this case the tree is no longer a 'binary' tree where each node has 2 children, but still uses the binary value of the key to traverse the tree. 
 
-The width of each node in the tree can be determined at compile time by specifying the *bit width* of the tree, which means that many bits are at each node to index into the next node or to store the value. The width of each node then becomes 2<sup>bit width</sup>.
+As the size of each node increases, the structure becomes closer to that of a direct access table, and memory usage would also increase. The width of each node in the tree can be determined at compile time by specifying the *bit width* of the tree, which means that many bits are at each node to index into the next node or to store the value. The width of each node then becomes 2<sup>bit width</sup>.
 
 # Benchmarks
 
@@ -325,7 +335,7 @@ For 8 bit values `BinMap` was about 3 times as fast than `unordered_map`, and st
 
 ## Multithreaded vs Singlethreaded
 
-In this test the benchmark for a bit width of 3 was rerun, but with openMP disabled by not linking to its library during compilation. For the tests with openMP enabled, 4 threads were set to run.
+In this test the benchmark for a bit width of 3 was rerun, but with openMP disabled by not linking to its library during compilation. For the tests with openMP enabled, 4 threads were used.
 
 ### Inserting values
 
@@ -462,6 +472,7 @@ Further work could include:
   - Implementing `contains` method to check if a key exists.
   - Implementing `reserve` method that prealocates a block of keys or parts of them (for example creating all the nodes within the next x layers).
   - Implementing `remove` method to recursively remove values and free memory taken up by empty nodes.
+  - Benchmarking the memory usage of each map.
   - Benchmarking `BinMap` for greater bit widths.
   - Benchmarking `BinMap` against other HashMap and ConcurrentHashMap implementations.
-  - Allowing `BinMap` to use non integral data types as keys through hashing, effectively converrting this into a HashMap, but retaining the tree structure and the benefits of no resizing being required. This would then require a system of handling collisions, whether through chaining by adding a linked list to each node when inserting values; or through open addresiing by inserting a new child node when needed.
+  - Allowing `BinMap` to use non integral data types as keys through hashing, effectively converrting this into a HashMap, but retaining the tree structure and the benefits of no resizing being required. This would then require a system of handling collisions, such as chaining by adding a linked list to each node when inserting values; or open addresiing by inserting a new child node when needed.
