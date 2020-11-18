@@ -1,4 +1,12 @@
-#define BINMAP_BITS 3
+/**             Copyright Sherwin da Cruz 2020.  
+ *    https://github.com/sherwin-dc/cpp-binary-prefix-tree
+ *   Distributed under the Boost Software License, Version 1.0.
+ *         (See accompanying file LICENSE or copy at
+ *           https://www.boost.org/LICENSE_1_0.txt)
+ */
+
+// Uncomment the following line or add it to your source code before including this header
+//#define BINMAP_BITS 3
 
 #include <cstddef>
 
