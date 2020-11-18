@@ -9,7 +9,7 @@ This works for keys that can be casted to a `size_t`, such as integers, and is f
 
 ## Speed
 
-All operations performed are on the order of θ(log(n)).
+Insering and retrieving values are on the order of O(log(n)).
 For keys with smaller values (~2<sup>16</sup>) operations are performed faster than with `std::unordered_map`. See [Benchmarks](#benchmarks) for details.
 
 ## Thread Safety
@@ -20,6 +20,59 @@ The concurrent version of the map makes use of atomics to allow multiple threads
 
 This map creates new nodes an needed, and no resizing is required, unlike some hash maps. This means any pointers directly referencing values in the tree would always be valid.
 
+# Usage
+
+## Single threaded
+
+```c++
+#define BINMAP_BITS 4                               // specify bit width of tree
+#include "SimpleBinTree.hpp"
+...
+
+int main() {
+  // Simple Bin Map
+    BinTree::SimpleBinMap<std::string> map;         // map of int keys to string values
+
+    map.insert(5, "foo");                           // insert key-value pair
+    assert(map.get(5) == "foo");                    // obtain value using key. ensure that (i, value) already exists in the map first!
+    map.get(5) = "bar"                              // changing an existing key using assignment
+    assert(map.get(5) == "bar");
+
+    std::string * ptr = map.query(6);               // reserving space for the key '6', and also obtaining pointer to the uninitialised value in the map
+    *ptr = "baz";
+    assert(map.get(6) == "baz");
+}
+```
+
+## Multithreaded
+
+```c++
+#define BINMAP_BITS 4                               // specify bit width of tree
+#include "ConcurrentBinTree.hpp"
+#include <atomic>
+...
+
+int main() {
+  // Concurrent Bin Map
+    BinTree::ConcurrentBinMap<std::string> map;
+    ...
+
+    /* Inside multiple threads */
+    map.insert(i, value);                           // any existing value associated with the key would be overwritten, possibly by another thread
+    value = map.get(i);                             // ensure that (i, value) already exists in the map first!
+
+    std::atomic<std::string> * ptr = map.query(j);  // using query() to obtain pointer to atomic value before modifying it
+    *ptr.store(value, std::memory_order);
+
+
+    /* Idle thread reserving space */
+    map.query(j);
+
+    /* Another thread inputing values */
+    map.insert(j, value);
+
+}
+```
 
 # Implementation
 
@@ -272,10 +325,143 @@ For 8 bit values `BinMap` was about 3 times as fast than `unordered_map`, and st
 
 ## Multithreaded vs Singlethreaded
 
+In this test the benchmark for a bit width of 3 was rerun, but with openMP disabled by not linking to its library during compilation. For the tests with openMP enabled, 4 threads were set to run.
+
+### Inserting values
+
+<details>
+
+<summary>View benchmark results</summary>
+
+```c++
+----------------------------------------------------------------------------------------------
+Benchmark                                                    Time             CPU   Iterations
+----------------------------------------------------------------------------------------------
+
+/* unordered_map */
+BM_std_unordered_map_insert_reserve/2/real_time            291 ns          293 ns      2159667
+BM_std_unordered_map_insert_reserve/4/real_time            521 ns          518 ns      1392193
+BM_std_unordered_map_insert_reserve/6/real_time           1553 ns         1548 ns       461105
+BM_std_unordered_map_insert_reserve/8/real_time           8923 ns         8920 ns        72995
+BM_std_unordered_map_insert_reserve/10/real_time         31393 ns        31395 ns        21207
+BM_std_unordered_map_insert_reserve/12/real_time        124764 ns       124823 ns         5625
+BM_std_unordered_map_insert_reserve/14/real_time        617406 ns       617921 ns         1282
+BM_std_unordered_map_insert_reserve/16/real_time       2461009 ns      2462134 ns          288
+BM_std_unordered_map_insert_reserve/32/real_time     215482200 ns    215479591 ns            3
+BM_std_unordered_map_insert_reserve/64/real_time     194774850 ns    194774261 ns            4
+
+/* SimpleBinMap (BINMAP_BITS=3) */
+BM_SimpleBinMap_insert_no_reserve/2/real_time              246 ns          248 ns      3247610
+BM_SimpleBinMap_insert_no_reserve/4/real_time              405 ns          407 ns      1663915
+BM_SimpleBinMap_insert_no_reserve/6/real_time              543 ns          546 ns      1281282
+BM_SimpleBinMap_insert_no_reserve/8/real_time             4155 ns         4159 ns       165713
+BM_SimpleBinMap_insert_no_reserve/10/real_time           32594 ns        32672 ns        24810
+BM_SimpleBinMap_insert_no_reserve/12/real_time           41186 ns        41215 ns        17167
+BM_SimpleBinMap_insert_no_reserve/14/real_time          384593 ns       384875 ns         1856
+BM_SimpleBinMap_insert_no_reserve/16/real_time         2782199 ns      2784006 ns          248
+BM_SimpleBinMap_insert_no_reserve/32/real_time       924104800 ns    924093460 ns            1
+BM_SimpleBinMap_insert_no_reserve/64/real_time      2384347600 ns   2384320414 ns            1
+
+/* ConcurrentBinMap (BINMAP_BITS=3) with openMP turned off */
+BM_ConcurrentBinMap_insert_no_reserve/2/real_time          223 ns          227 ns      3298776
+BM_ConcurrentBinMap_insert_no_reserve/4/real_time          491 ns          497 ns      1448631
+BM_ConcurrentBinMap_insert_no_reserve/6/real_time          608 ns          611 ns      1109454
+BM_ConcurrentBinMap_insert_no_reserve/8/real_time         4752 ns         4753 ns       152355
+BM_ConcurrentBinMap_insert_no_reserve/10/real_time       28922 ns        28954 ns        19419
+BM_ConcurrentBinMap_insert_no_reserve/12/real_time       43351 ns        43384 ns        16680
+BM_ConcurrentBinMap_insert_no_reserve/14/real_time      385086 ns       385232 ns         1761
+BM_ConcurrentBinMap_insert_no_reserve/16/real_time     3021692 ns      3023652 ns          240
+BM_ConcurrentBinMap_insert_no_reserve/32/real_time   973621500 ns    973613279 ns            1
+BM_ConcurrentBinMap_insert_no_reserve/64/real_time  2434763400 ns   2434738849 ns            1
+
+/* ConcurrentBinMap (BINMAP_BITS=3) with openMP turned on */
+BM_ConcurrentBinMap_insert_no_reserve/2/real_time         1616 ns         1630 ns       588302
+BM_ConcurrentBinMap_insert_no_reserve/4/real_time         2861 ns         2887 ns       244370
+BM_ConcurrentBinMap_insert_no_reserve/6/real_time         3126 ns         3151 ns       213016
+BM_ConcurrentBinMap_insert_no_reserve/8/real_time        10294 ns        10327 ns        72562
+BM_ConcurrentBinMap_insert_no_reserve/10/real_time       55586 ns        55676 ns        10000
+BM_ConcurrentBinMap_insert_no_reserve/12/real_time       65362 ns        65614 ns        11012
+BM_ConcurrentBinMap_insert_no_reserve/14/real_time      578334 ns       579032 ns         1385
+BM_ConcurrentBinMap_insert_no_reserve/16/real_time     3995498 ns      3997647 ns          175
+BM_ConcurrentBinMap_insert_no_reserve/32/real_time  4351158400 ns   1142168315 ns            1
+BM_ConcurrentBinMap_insert_no_reserve/64/real_time 13526372900 ns   3143463510 ns            1
+```
+
+</details>
+
+### Reading values
+
+<details>
+
+<summary>View benchmark results</summary>
+
+```c++
+----------------------------------------------------------------------------------------------
+Benchmark                                                    Time             CPU   Iterations
+----------------------------------------------------------------------------------------------
+
+/* unordered_map */
+BM_std_unordered_map_read/2/real_time                     12.0 ns         12.0 ns     56661810
+BM_std_unordered_map_read/4/real_time                     47.0 ns         47.0 ns     14976087
+BM_std_unordered_map_read/6/real_time                      190 ns          190 ns      3657207
+BM_std_unordered_map_read/8/real_time                     1021 ns         1021 ns       742950
+BM_std_unordered_map_read/10/real_time                    3011 ns         3011 ns       224034
+BM_std_unordered_map_read/12/real_time                   12313 ns        12313 ns        56468
+BM_std_unordered_map_read/14/real_time                   48491 ns        48491 ns        14388
+BM_std_unordered_map_read/16/real_time                  200438 ns       200435 ns         3418
+BM_std_unordered_map_read/32/real_time                35317916 ns     35317848 ns           19
+BM_std_unordered_map_read/64/real_time                35121370 ns     35121415 ns           20
+
+/* SimpleBinMap (BINMAP_BITS=3) */
+BM_SimpleBinMap_read/2/real_time                          3.73 ns         3.73 ns    182693211
+BM_SimpleBinMap_read/4/real_time                          19.0 ns         19.0 ns     36188540
+BM_SimpleBinMap_read/6/real_time                          85.7 ns         85.7 ns      7741804
+BM_SimpleBinMap_read/8/real_time                           415 ns          415 ns      1833608
+BM_SimpleBinMap_read/10/real_time                         1746 ns         1746 ns       381444
+BM_SimpleBinMap_read/12/real_time                         7506 ns         7506 ns        90643
+BM_SimpleBinMap_read/14/real_time                        64168 ns        64167 ns        10419
+BM_SimpleBinMap_read/16/real_time                       444752 ns       444745 ns         1551
+BM_SimpleBinMap_read/32/real_time                     81659843 ns     81660219 ns            7
+BM_SimpleBinMap_read/64/real_time                    271722800 ns    271723949 ns            2
+
+/* ConcurrentBinMap (BINMAP_BITS=3) with openMP turned off */
+BM_ConcurrentBinMap_read/2/real_time                      6.40 ns         6.40 ns     95794747
+BM_ConcurrentBinMap_read/4/real_time                      20.3 ns         20.3 ns     34118414
+BM_ConcurrentBinMap_read/6/real_time                      83.5 ns         83.5 ns      8418855
+BM_ConcurrentBinMap_read/8/real_time                       429 ns          429 ns      1651400
+BM_ConcurrentBinMap_read/10/real_time                     1849 ns         1849 ns       373060
+BM_ConcurrentBinMap_read/12/real_time                     8658 ns         8658 ns        75904
+BM_ConcurrentBinMap_read/14/real_time                    71516 ns        71517 ns         9371
+BM_ConcurrentBinMap_read/16/real_time                   527207 ns       527207 ns         1284
+BM_ConcurrentBinMap_read/32/real_time                 83285550 ns     83284901 ns            8
+BM_ConcurrentBinMap_read/64/real_time                270331100 ns    270332063 ns            3
+
+/* ConcurrentBinMap (BINMAP_BITS=3) with openMP turned on */
+BM_ConcurrentBinMap_read/2/real_time                      1132 ns         1132 ns       757783
+BM_ConcurrentBinMap_read/4/real_time                      1073 ns         1073 ns       638248
+BM_ConcurrentBinMap_read/6/real_time                      1245 ns         1245 ns       550202
+BM_ConcurrentBinMap_read/8/real_time                      1402 ns         1402 ns       493758
+BM_ConcurrentBinMap_read/10/real_time                     2298 ns         2298 ns       352237
+BM_ConcurrentBinMap_read/12/real_time                     6457 ns         6457 ns       110455
+BM_ConcurrentBinMap_read/14/real_time                    39322 ns        39322 ns        14976
+BM_ConcurrentBinMap_read/16/real_time                   251376 ns       251376 ns         2952 
+BM_ConcurrentBinMap_read/32/real_time                 34501565 ns     29282024 ns           20    <- Fastest 32
+BM_ConcurrentBinMap_read/64/real_time                114486267 ns     81944345 ns            6
+```
+
+</details>
+
+In both cases we can see that using `ConcurrentBinMap` over `SimpleBinMap` for singlethreaded operations only exerts a small penalty on performance. However, when multiple threads are inserting values simultaneouly the performance drops dramatically. This is likely due to false sharing with each node storing multiple atomic pointers. Howeevr, the situation is much better when reading data, with `ConcurrentBinMap` reading faster with 4 threads than a singlwe threaded `SimpleBinMap` when values were greater than 12 bits. This is the point where the number of values inserted is large enough such that multiple threads are more efficient. `ConcurrentBinMap` was able to read 1 million 32 bit values with 4 threads just as fast as a single threaded `unordered_map`. The difference between inserting and reading values is that reading only uses atomic reads on variables, hence false sharing is not a problem unlike inserting values where cache lines have to be invalidated during atomic writes to variables.  
+
+Hence `ConcurrentBinMap` is best used to read a larger number of values concurrently, but can still be used to insert values across multiple threads without the user haing to manually implement locks.
+
 # Further work
 
 Further work could include:
-  - Creating a `contains` method to check if a key exists.
-  - Creating a `reserve` method that prealocates a block of keys or parts of them (for example creating all the nodes within the next x layers).
+  - Overloading `operator[]` for a more natural coding style. 
+  - Implementing `contains` method to check if a key exists.
+  - Implementing `reserve` method that prealocates a block of keys or parts of them (for example creating all the nodes within the next x layers).
+  - Implementing `remove` method to recursively remove values and free memory taken up by empty nodes.
   - Benchmarking `BinMap` for greater bit widths.
   - Benchmarking `BinMap` against other HashMap and ConcurrentHashMap implementations.
+  - Allowing `BinMap` to use non integral data types as keys through hashing, effectively converrting this into a HashMap, but retaining the tree structure and the benefits of no resizing being required. This would then require a system of handling collisions, whether through chaining by adding a linked list to each node when inserting values; or through open addresiing by inserting a new child node when needed.

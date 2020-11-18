@@ -1,9 +1,9 @@
-#define BINMAP_EXP 3
+#define BINMAP_BITS 3
 
 #include <cstddef>
 
-#ifndef BINMAP_EXP
-  #error "Width of Map not defined. Before inclusion or at top of the file, define with '#define BINMAP_EXP n' for a s_node width of 2^n"
+#ifndef BINMAP_BITS
+  #error "Width of Map not defined. Before inclusion or at top of the file, define with '#define BINMAP_BITS n' for a s_node width of 2^n"
 #endif
 
 
@@ -20,7 +20,7 @@
 
 #define BINMAP_POW_(x) BINMAP_POW_##x
 #define BINMAP_POW(x) BINMAP_POW_(x)
-#define BINMAP_WIDTH BINMAP_POW(BINMAP_EXP)
+#define BINMAP_WIDTH BINMAP_POW(BINMAP_BITS)
 
 namespace BinTree {
 
@@ -111,7 +111,7 @@ namespace BinTree {
     while (key) {
       // Get the last EXP bits
       idx = key & (BINMAP_WIDTH-1);
-      key = key >> BINMAP_EXP;
+      key = key >> BINMAP_BITS;
       if (!key) {
         break;
       }
@@ -131,7 +131,7 @@ namespace BinTree {
     while (key) {
       // Get the last EXP bits
       idx = key & (BINMAP_WIDTH-1);
-      key = key >> BINMAP_EXP; 
+      key = key >> BINMAP_BITS; 
       if(!key) {
         break;
       }     
